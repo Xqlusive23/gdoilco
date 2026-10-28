@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { encrypt, loadKey } from './crypto.js';
 import { createStore } from './store.js';
 import { createAdminRouter } from './admin.js';
+import { createMailer } from './mailer.js';
 import { ROLES, CONTACT } from '../src/data.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -22,6 +23,8 @@ const MAX_FILE = 8 * 1024 * 1024;
 let KEY;
 try { KEY = loadKey(); } catch (e) { console.error(e.message); process.exit(1); }
 const store = createStore({ dataDir: DATA_DIR, key: KEY, seedRoles: ROLES });
+const mailer = createMailer({ dataDir: DATA_DIR });
+console.log(mailer.live ? `Emails are sent through ${process.env.SMTP_HOST}.` : 'No SMTP_HOST in .env: emails are saved as web pages in the outbox folder instead of being sent.');
 
 const app = express();
 app.disable('x-powered-by');
@@ -78,7 +81,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 // The live list of positions. The admin site edits it; the public pages read it.
 app.get('/api/positions', (req, res) => res.json({ positions: store.listPositions() }));
 
-app.use('/api/admin', createAdminRouter({ store, key: KEY, dataDir: DATA_DIR }));
+app.use('/api/admin', createAdminRouter({ store, key: KEY, dataDir: DATA_DIR, mailer }));
 
 app.post('/api/applications', (req, res) => {
   if (limited(req.ip)) return res.status(429).json({ error: 'Too many applications from this connection. Please try again later.' });
@@ -144,6 +147,10 @@ app.post('/api/applications', (req, res) => {
         review: { status: 'new', note: '' },
       };
       store.saveApplication(record);
+      // Confirmation email goes out in the background so the applicant is not kept waiting.
+      mailer.send('confirmation', { fullName: f.fullName, email: f.email, ref: id, position: f.position, submittedAt }).then((r) => {
+        store.updateRecord(id, (x) => { x.emails = { ...(x.emails || {}), confirmation: { ok: r.ok, mode: r.mode, at: new Date().toISOString(), error: r.error || undefined } }; });
+      }).catch(() => {});
       console.log(`Application ${id} saved for ${role.role}`);
       return res.status(201).json({ ok: true, ref: id, submittedAt });
     } catch (e) {

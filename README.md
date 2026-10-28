@@ -61,6 +61,24 @@ if the Social Security number or the email address matches an earlier one (the e
 The check uses keyed hashes, so it works without keeping extra copies of the numbers. If an admin deletes an application,
 that person can apply again.
 
+## Emails and approval
+
+- **On submit,** the applicant gets a designed email (logo, rig picture, application number, position, what happens next).
+  Their SSN and ID are never in it. If the email cannot be sent, the application is still saved.
+- **Approval:** open an application in the admin and tick all five checks (ID, SSN, work authorization, experience and certificates,
+  reference). Only then does "Approve and email applicant" work. The server also refuses an approval with a missing check.
+  Approving sends the applicant an "Application approved" email and records who approved it and when.
+  An approved application cannot be moved back to another status. If it was a mistake, delete it.
+  The admin also shows whether each email was sent, and has a Resend button for both.
+- **Delete:** the Delete button on every row of the list (and inside an application) removes the saved details, the SSN and the ID images for good.
+  The person can then apply again.
+- **Turning on real sending:** fill in the `SMTP_*`, `MAIL_FROM` and `PUBLIC_URL` lines in `.env` with the details from an email provider
+  (Gmail with an app password, Outlook, Brevo, SendGrid, Mailgun, Amazon SES and others all work), then restart the server.
+  Use a `MAIL_FROM` address on your own domain and ask your provider to set up SPF and DKIM for it, or messages may go to spam.
+- **Before that, on your own computer:** with `SMTP_HOST` empty nothing is sent. Each email is saved as a web page in
+  `server/data/outbox/`. Double-click one to see exactly what applicants will get.
+- The pictures in the emails are in `server/email/assets/`. Replace them with your own (same file names) to change the look.
+
 **How the admin login is protected:** salted scrypt password hash, a limit of 5 wrong attempts per 15 minutes per address,
 a random session cookie that scripts cannot read (httpOnly, SameSite=Strict, and Secure over https), sessions that end after
 30 minutes of no activity or 8 hours in total, and a same-site check on every change.

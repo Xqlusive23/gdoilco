@@ -7,7 +7,8 @@ import { decrypt } from './crypto.js';
 import { DISCIPLINES } from '../src/data.js';
 
 export const REF_RE = /^GD-\d{6}-[0-9A-F]{6}$/;
-export const STATUSES = ['new', 'reviewing', 'shortlisted', 'hired', 'rejected'];
+// 'approved' is not in this list on purpose: it can only be set through the approval checklist (POST .../approve).
+export const STATUSES = ['new', 'reviewing', 'shortlisted', 'rejected'];
 
 const clean = (v, max) => String(v ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').trim().slice(0, max);
 
@@ -124,6 +125,14 @@ export function createStore({ dataDir, key, seedRoles }) {
         try { out.push(JSON.parse(fs.readFileSync(path.join(APPS, name), 'utf8'))); } catch { /* skip */ }
       }
       return out.sort((a, b) => String(b.submittedAt).localeCompare(String(a.submittedAt)));
+    },
+    // Change one saved application: store.updateRecord(ref, (rec) => { rec.x = 1; })
+    updateRecord(ref, mutate) {
+      const rec = readApp(ref);
+      if (!rec) return null;
+      mutate(rec);
+      writeAtomic(path.join(APPS, ref + '.json'), JSON.stringify(rec, null, 2));
+      return rec;
     },
     updateReview(ref, { status, note }) {
       const rec = readApp(ref);

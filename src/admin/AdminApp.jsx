@@ -3,7 +3,15 @@ import { adminApi, apiBase, AuthError } from './api.js';
 import { DISCIPLINES } from '../data.js';
 import './admin.css';
 
-const STATUSES = ['new', 'reviewing', 'shortlisted', 'hired', 'rejected'];
+const STATUSES = ['new', 'reviewing', 'shortlisted', 'rejected']; // 'approved' is set only through the Approve checklist
+const ALL_STATUSES = ['new', 'reviewing', 'shortlisted', 'approved', 'rejected'];
+const CHECKS = [
+  ['identity', 'ID checked: the photo ID is clear, not expired, and matches the name and details given'],
+  ['ssn', 'Social Security number checked and consistent with the applicant'],
+  ['workAuth', 'Authorization to work in the U.S. confirmed'],
+  ['credentials', 'Experience and certificates match what the position needs'],
+  ['reference', 'Reference contacted and satisfactory'],
+];
 const fmt = (iso) => { try { return new Date(iso).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }); } catch { return iso; } };
 
 // ---------------------------------------------------------------- sign in
@@ -59,6 +67,64 @@ function IdViewer({ app, side, onAuth }) {
   );
 }
 
+const mailLine = (e) => (!e ? 'Not sent yet' : e.ok ? `Sent ${fmt(e.at)}${e.mode === 'outbox' ? ' (saved as a file, not really sent)' : ''}` : `Failed ${fmt(e.at)}: ${e.error || 'unknown error'}`);
+
+// The approval step. Every check must be ticked before the button works; the server enforces this too.
+function Approval({ app, setApp, onChanged, onAuth }) {
+  const [checks, setChecks] = useState({});
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState('');
+  const [msg, setMsg] = useState({ kind: '', text: '' });
+  const all = CHECKS.every(([k]) => checks[k]);
+  const approved = app.review.status === 'approved';
+
+  const run = async (label, fn) => {
+    setBusy(label); setMsg({ kind: '', text: '' });
+    try { await fn(); } catch (x) { if (x instanceof AuthError) onAuth(); else setMsg({ kind: 'err', text: x.message }); }
+    setBusy('');
+  };
+  const approve = () => run('approve', async () => {
+    if (!window.confirm(`Approve ${app.fullName} (${app.ref}) and email them now? This cannot be undone.`)) return;
+    const r = await adminApi(`/applications/${app.ref}/approve`, { method: 'POST', body: { checklist: checks, note } });
+    setApp(r.application); onChanged();
+    setMsg(r.email.ok ? { kind: 'ok', text: r.email.mode === 'outbox' ? 'Approved. Email is not set up, so it was saved as a file instead of being sent.' : 'Approved. The applicant has been emailed.' } : { kind: 'err', text: 'Approved, but the email failed: ' + r.email.error + '. Use "Resend" below once the email settings are fixed.' });
+  });
+  const resend = (type) => run('resend-' + type, async () => {
+    const r = await adminApi(`/applications/${app.ref}/resend`, { method: 'POST', body: { type } });
+    setApp(r.application);
+    setMsg(r.email.ok ? { kind: 'ok', text: 'Email sent again.' } : { kind: 'err', text: 'The email failed: ' + r.email.error });
+  });
+
+  return (
+    <section className="ad-approval">
+      <h3>Approval</h3>
+      {approved ? (
+        <p className="ad-ok-box">Approved by <b>{app.approval?.by}</b> on {fmt(app.approval?.at)}.</p>
+      ) : (
+        <>
+          <p className="ad-muted small">Check the application thoroughly, then tick each item. All five are needed. Approving emails the applicant at once.</p>
+          <div className="ad-checks">
+            {CHECKS.map(([k, label]) => (
+              <label key={k}><input type="checkbox" checked={!!checks[k]} onChange={(e) => setChecks({ ...checks, [k]: e.target.checked })} /> <span>{label}</span></label>
+            ))}
+          </div>
+          <label className="ad-notelabel">Internal note (optional, not included in the email)
+            <input value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} placeholder="For example: strong A/P background, call on Monday" />
+          </label>
+          <button className="ad-btn primary" disabled={!all || !!busy} onClick={approve}>{busy === 'approve' ? 'Approving...' : 'Approve and email applicant'}</button>
+          {!all && <span className="ad-muted small"> Tick all five checks to enable this.</span>}
+        </>
+      )}
+      {msg.text && <div className={msg.kind === 'ok' ? 'ad-ok-box' : 'ad-err'} role="status">{msg.text}</div>}
+      <div className="ad-mails">
+        <div><b>Confirmation email</b><span>{mailLine(app.emails?.confirmation)}</span><button className="ad-btn small" disabled={!!busy} onClick={() => resend('confirmation')}>Resend</button></div>
+        {approved && <div><b>Approval email</b><span>{mailLine(app.emails?.approval)}</span><button className="ad-btn small" disabled={!!busy} onClick={() => resend('approval')}>Resend</button></div>}
+      </div>
+      {app.mailMode === 'outbox' && <p className="ad-muted small">Email is not connected yet (no SMTP settings in .env), so emails are saved as pages in <span className="ad-mono">server/data/outbox</span> instead of being sent.</p>}
+    </section>
+  );
+}
+
 function Detail({ ref_, onClose, onChanged, onAuth }) {
   const [app, setApp] = useState(null);
   const [err, setErr] = useState('');
@@ -95,11 +161,12 @@ function Detail({ ref_, onClose, onChanged, onAuth }) {
           <>
             <p className="ad-muted">Submitted {fmt(app.submittedAt)}</p>
             <div className="ad-review">
-              <label>Status<select value={status} onChange={(e) => { setStatus(e.target.value); setSaved(''); }}>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></label>
+              <label>Status<select value={status} disabled={app.review.status === 'approved'} onChange={(e) => { setStatus(e.target.value); setSaved(''); }}>{(app.review.status === 'approved' ? ALL_STATUSES : STATUSES).map((s) => <option key={s} value={s}>{s}</option>)}</select></label>
               <label className="grow">Internal note<input value={note} maxLength={1000} onChange={(e) => { setNote(e.target.value); setSaved(''); }} placeholder="Only admins see this" /></label>
               <button className="ad-btn primary" onClick={save}>Save</button>
               {saved && <span className="ad-ok">{saved}</span>}
             </div>
+            <Approval app={app} setApp={setApp} onChanged={onChanged} onAuth={onAuth} />
             <h3>Applicant</h3>
             <dl className="ad-dl">
               <Field k="Full name">{app.fullName}</Field><Field k="Email"><a href={'mailto:' + app.email}>{app.email}</a></Field>
@@ -161,8 +228,13 @@ function Applications({ onAuth }) {
     return !t || [r.ref, r.fullName, r.email, r.phone, r.position, r.residence].some((x) => String(x).toLowerCase().includes(t));
   }), [rows, q, pos, st]);
 
+  const removeRow = async (r) => {
+    if (!window.confirm(`Delete application ${r.ref} from ${r.fullName} permanently? This removes the saved details, the SSN and the ID images. This cannot be undone.`)) return;
+    try { await adminApi('/applications/' + r.ref, { method: 'DELETE' }); load(); }
+    catch (x) { if (x instanceof AuthError) onAuth(); else setErr(x.message); }
+  };
   const exportSsn = (e) => { if (!window.confirm('This file will contain full Social Security numbers. Keep it secure and delete it when you are done. Download it?')) e.preventDefault(); };
-  const counts = useMemo(() => Object.fromEntries(STATUSES.map((s) => [s, (rows || []).filter((r) => r.review.status === s).length])), [rows]);
+  const counts = useMemo(() => Object.fromEntries(ALL_STATUSES.map((s) => [s, (rows || []).filter((r) => r.review.status === s).length])), [rows]);
 
   if (err) return <div className="ad-err" role="alert">{err}</div>;
   if (!rows) return <p className="ad-muted">Loading applications...</p>;
@@ -172,12 +244,12 @@ function Applications({ onAuth }) {
         <div><b>{rows.length}</b><span>Total applications</span></div>
         <div><b>{counts.new}</b><span>New</span></div>
         <div><b>{counts.reviewing + counts.shortlisted}</b><span>In review or shortlisted</span></div>
-        <div><b>{counts.hired}</b><span>Hired</span></div>
+        <div><b>{counts.approved}</b><span>Approved</span></div>
       </div>
       <div className="ad-toolbar">
         <input type="search" placeholder="Search name, email, phone or ID" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search applications" />
         <select value={pos} onChange={(e) => setPos(e.target.value)} aria-label="Filter by position"><option value="">All positions</option>{positions.map((p) => <option key={p}>{p}</option>)}</select>
-        <select value={st} onChange={(e) => setSt(e.target.value)} aria-label="Filter by status"><option value="">All statuses</option>{STATUSES.map((s) => <option key={s}>{s}</option>)}</select>
+        <select value={st} onChange={(e) => setSt(e.target.value)} aria-label="Filter by status"><option value="">All statuses</option>{ALL_STATUSES.map((s) => <option key={s}>{s}</option>)}</select>
         <span className="spacer" />
         <a className="ad-btn" href={apiBase + '/api/admin/export.csv'}>Export CSV</a>
         <a className="ad-btn" href={apiBase + '/api/admin/export.csv?ssn=1'} onClick={exportSsn}>Export CSV with SSN</a>
@@ -185,12 +257,13 @@ function Applications({ onAuth }) {
       {shown.length === 0 ? <div className="ad-empty">{rows.length === 0 ? 'No applications yet.' : 'No applications match your search.'}</div> : (
         <div className="ad-tablewrap">
           <table className="ad-table">
-            <thead><tr><th>Application ID</th><th>Name</th><th>Position</th><th>Email</th><th>Phone</th><th>Submitted</th><th>Status</th></tr></thead>
+            <thead><tr><th>Application ID</th><th>Name</th><th>Position</th><th>Email</th><th>Phone</th><th>Submitted</th><th>Status</th><th><span className="ad-sr">Actions</span></th></tr></thead>
             <tbody>
               {shown.map((r) => (
                 <tr key={r.ref} tabIndex={0} onClick={() => setOpen(r.ref)} onKeyDown={(e) => { if (e.key === 'Enter') setOpen(r.ref); }}>
                   <td className="ad-mono">{r.ref}</td><td><b>{r.fullName}</b></td><td>{r.position}</td><td>{r.email}</td><td>{r.phone}</td><td>{fmt(r.submittedAt)}</td>
                   <td><span className={'ad-pill ' + r.review.status}>{r.review.status}</span></td>
+                  <td><button className="ad-btn small danger" onClick={(e) => { e.stopPropagation(); removeRow(r); }} aria-label={`Delete application ${r.ref}`}>Delete</button></td>
                 </tr>
               ))}
             </tbody>

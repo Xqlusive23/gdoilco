@@ -197,7 +197,7 @@ function ApplyForm({ openRoles: OPEN_ROLES }) {
             <div className="done-panel show" aria-live="polite">
               <div className="eyebrow">Reference number</div>
               <div className="refno">{result.record.ref}</div>
-              <p className="status-line">Your application, Social Security number and ID were sent over an encrypted connection. Keep this reference and quote it when you contact {CONTACT.email}.</p>
+              <p className="status-line">Your application, Social Security number and ID were sent over an encrypted connection. A confirmation email with this application number is on its way to {result.record.email}. If you do not see it within a few minutes, check your spam folder. Keep this reference and quote it when you contact {CONTACT.email}.</p>
               <h3>Your copy</h3>
               <pre tabIndex={0}>{text}</pre>
               <div className="btn-row" style={{ margin: 0 }}>

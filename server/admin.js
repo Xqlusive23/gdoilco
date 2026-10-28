@@ -8,6 +8,7 @@ import express from 'express';
 import { decrypt } from './crypto.js';
 import { checkPassword } from './password.js';
 import { REF_RE, STATUSES } from './store.js';
+import { createMailer } from './mailer.js';
 
 const COOKIE = 'gd_admin';
 const ABSOLUTE_MS = 8 * 3600e3;
@@ -32,7 +33,10 @@ function csvCell(v) {
   return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
-export function createAdminRouter({ store, key, dataDir }) {
+// Everything an admin must confirm before an application can be approved.
+export const CHECKS = ['identity', 'ssn', 'workAuth', 'credentials', 'reference'];
+
+export function createAdminRouter({ store, key, dataDir, mailer = createMailer({ dataDir }) }) {
   const r = express.Router();
   const sessions = new Map(); // sha256(token) -> { user, created, last }
   const fails = new Map(); // ip -> [timestamps]
@@ -117,7 +121,7 @@ export function createAdminRouter({ store, key, dataDir }) {
   const last4 = (rec) => rec.ssn?.last4 || '';
   const view = (rec) => {
     const { ssn, idFiles, fp, ...rest } = rec;
-    return { ...rest, ssnLast4: last4(rec), idUploaded: { front: !!idFiles?.front, back: !!idFiles?.back }, review: rec.review || { status: 'new', note: '' } };
+    return { ...rest, ssnLast4: last4(rec), idUploaded: { front: !!idFiles?.front, back: !!idFiles?.back }, review: rec.review || { status: 'new', note: '' }, approval: rec.approval || null, emails: rec.emails || {}, mailMode: mailer.live ? 'smtp' : 'outbox' };
   };
 
   // ----- applications -----
@@ -160,11 +164,58 @@ export function createAdminRouter({ store, key, dataDir }) {
 
   r.patch('/applications/:ref', auth, (req, res) => {
     const { status, note } = req.body || {};
+    const current = store.getApplication(req.params.ref);
+    if (current?.review?.status === 'approved' && status !== 'approved') return res.status(400).json({ error: 'An approved application cannot be moved to another status. Delete it if it was approved by mistake.' });
+    if (current?.review?.status === 'approved') { // only the note can change
+      const out = store.updateRecord(req.params.ref, (rec) => { rec.review = { ...rec.review, note: String(note ?? '').slice(0, 1000) }; });
+      log(req, 'review_note', req.params.ref);
+      return res.json(view(out));
+    }
     const out = store.updateReview(req.params.ref, { status, note });
     if (!out) return res.status(404).json({ error: 'Not found.' });
     if (out.error) return res.status(400).json({ error: out.error });
     log(req, 'review_' + status, req.params.ref);
     res.json(view(out));
+  });
+
+  // Send (or re-send) one of the applicant emails and remember how it went.
+  async function sendAndRecord(type, ref) {
+    const rec = store.getApplication(ref);
+    const result = await mailer.send(type, {
+      fullName: rec.fullName, email: rec.email, ref: rec.ref, position: rec.position,
+      submittedAt: rec.submittedAt, approvedAt: rec.approval?.at,
+    });
+    const entry = { ok: result.ok, mode: result.mode, at: new Date().toISOString(), error: result.error || undefined };
+    store.updateRecord(ref, (x) => { x.emails = { ...(x.emails || {}), [type]: entry }; });
+    return entry;
+  }
+
+  r.post('/applications/:ref/approve', auth, async (req, res) => {
+    const rec = store.getApplication(req.params.ref);
+    if (!rec) return res.status(404).json({ error: 'Not found.' });
+    if (rec.review?.status === 'approved') return res.status(409).json({ error: 'This application is already approved.' });
+    const checklist = req.body?.checklist || {};
+    if (!CHECKS.every((k) => checklist[k] === true)) return res.status(400).json({ error: 'Complete every check before approving.' });
+    const at = new Date().toISOString();
+    store.updateRecord(rec.ref, (x) => {
+      x.review = { status: 'approved', note: String(req.body?.note ?? x.review?.note ?? '').slice(0, 1000), updatedAt: at };
+      x.approval = { by: req.admin.user, at, checklist: Object.fromEntries(CHECKS.map((k) => [k, true])) };
+    });
+    log(req, 'approve_application', rec.ref);
+    const email = await sendAndRecord('approval', rec.ref);
+    log(req, email.ok ? 'email_approval_sent' : 'email_approval_failed', rec.ref);
+    res.json({ application: view(store.getApplication(rec.ref)), email });
+  });
+
+  r.post('/applications/:ref/resend', auth, async (req, res) => {
+    const rec = store.getApplication(req.params.ref);
+    if (!rec) return res.status(404).json({ error: 'Not found.' });
+    const type = req.body?.type;
+    if (!['confirmation', 'approval'].includes(type)) return res.status(400).json({ error: 'Unknown email type.' });
+    if (type === 'approval' && rec.review?.status !== 'approved') return res.status(400).json({ error: 'This application is not approved.' });
+    const email = await sendAndRecord(type, rec.ref);
+    log(req, email.ok ? `email_${type}_sent` : `email_${type}_failed`, rec.ref);
+    res.json({ application: view(store.getApplication(rec.ref)), email });
   });
 
   r.delete('/applications/:ref', auth, (req, res) => {
