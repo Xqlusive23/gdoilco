@@ -171,7 +171,7 @@ function Detail({ ref_, onClose, onChanged, onAuth }) {
             <dl className="ad-dl">
               <Field k="Full name">{app.fullName}</Field><Field k="Email"><a href={'mailto:' + app.email}>{app.email}</a></Field>
               <Field k="Phone">{app.phone}</Field><Field k="Lives in">{app.residence}</Field>
-              <Field k="Authorized to work in the U.S.">{app.authorized}</Field><Field k="Needs sponsorship">{app.sponsorship}</Field>
+              <Field k="Authorized to work in the United States?">{app.authorized}</Field><Field k="Needs sponsorship">{app.sponsorship}</Field>
             </dl>
             <h3>Job</h3>
             <dl className="ad-dl">

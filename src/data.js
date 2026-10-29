@@ -32,4 +32,4 @@ export const ROLES = [
 ];
 
 // Edit these once: they appear on the Contact page and on the application form.
-export const CONTACT = { email: 'careers@gdoilco.com', phone: '+1 (713) 555-0100' };
+export const CONTACT = { email: 'careers@gdoilco.com', phone: '+1 (430) 341-0484' };
