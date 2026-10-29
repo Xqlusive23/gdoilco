@@ -13,7 +13,7 @@ const MIME = { '.jpg': 'image/jpeg', '.png': 'image/png' };
 const short = (e) => String(e?.code || e?.message || 'unknown error').replace(/[\r\n]+/g, ' ').slice(0, 160);
 
 export function createMailer({ dataDir, env = process.env }) {
-  const from = env.MAIL_FROM || 'GDoilco Careers <careers@gdoilco.com>';
+  const from = env.MAIL_FROM || 'GDoilco Careers <info@gdoilcompany.online>';
   const live = !!env.SMTP_HOST;
   const transport = live
     ? nodemailer.createTransport({
