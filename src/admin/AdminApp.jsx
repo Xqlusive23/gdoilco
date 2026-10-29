@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { adminApi, apiBase, AuthError } from './api.js';
 import { DISCIPLINES } from '../data.js';
 import './admin.css';
@@ -12,6 +13,19 @@ const CHECKS = [
   ['credentials', 'Experience and certificates match what the position needs'],
   ['reference', 'Reference contacted and satisfactory'],
 ];
+const ICONS = {
+  inbox: 'M3 13l3-8h12l3 8v6H3v-6zm0 0h5l1 3h6l1-3h5',
+  briefcase: 'M4 8h16v11H4zM9 8V5h6v3M4 13h16',
+  clock: 'M12 7v5l3 2M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+  out: 'M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10',
+  x: 'M6 6l12 12M18 6L6 18',
+  search: 'M11 18a7 7 0 100-14 7 7 0 000 14zM21 21l-5-5',
+  down: 'M12 4v11M7 11l5 5 5-5M5 20h14',
+  plus: 'M12 5v14M5 12h14',
+};
+function Icon({ name, size = 20 }) {
+  return <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={ICONS[name]} /></svg>;
+}
 const fmt = (iso) => { try { return new Date(iso).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }); } catch { return iso; } };
 
 // ---------------------------------------------------------------- sign in
@@ -141,6 +155,14 @@ function Detail({ ref_, onClose, onChanged, onAuth }) {
     return () => { off = true; };
   }, [ref_, onAuth]);
 
+  // Like a phone sheet: Escape closes it, and the page behind does not scroll.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    document.documentElement.classList.add('ad-lock');
+    return () => { window.removeEventListener('keydown', onKey); document.documentElement.classList.remove('ad-lock'); };
+  }, [onClose]);
+
   const guard = async (fn) => { try { await fn(); } catch (x) { if (x instanceof AuthError) onAuth(); else setErr(x.message); } };
   const reveal = () => guard(async () => { setErr(''); const r = await adminApi(`/applications/${ref_}/ssn`, { method: 'POST' }); setSsn(r.ssn); });
   const save = () => guard(async () => { setErr(''); const a = await adminApi('/applications/' + ref_, { method: 'PATCH', body: { status, note } }); setApp(a); setSaved('Saved'); onChanged(); });
@@ -149,12 +171,13 @@ function Detail({ ref_, onClose, onChanged, onAuth }) {
     await adminApi('/applications/' + ref_, { method: 'DELETE' }); onChanged(); onClose();
   });
 
-  return (
-    <div className="ad-panel" role="dialog" aria-modal="true" aria-label="Application details">
+  // Drawn outside the animated page area, otherwise the page's entrance animation would trap this fixed sheet inside it.
+  return createPortal(
+    <div className="ad-panel" role="dialog" aria-modal="true" aria-label="Application details" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="ad-panel-in">
         <div className="ad-panel-head">
           <div><div className="ad-mono">{ref_}</div><h2>{app ? app.fullName : 'Loading...'}</h2></div>
-          <button className="ad-btn" onClick={onClose}>Close</button>
+          <button className="ad-icon-btn" onClick={onClose} aria-label="Close"><Icon name="x" /></button>
         </div>
         {err && <div className="ad-err" role="alert">{err}</div>}
         {app && (
@@ -171,7 +194,7 @@ function Detail({ ref_, onClose, onChanged, onAuth }) {
             <dl className="ad-dl">
               <Field k="Full name">{app.fullName}</Field><Field k="Email"><a href={'mailto:' + app.email}>{app.email}</a></Field>
               <Field k="Phone">{app.phone}</Field><Field k="Lives in">{app.residence}</Field>
-              <Field k="Authorized to work in the United States?">{app.authorized}</Field><Field k="Needs sponsorship">{app.sponsorship}</Field>
+              <Field k="Authorized to work in the U.S.">{app.authorized}</Field><Field k="Needs sponsorship">{app.sponsorship}</Field>
             </dl>
             <h3>Job</h3>
             <dl className="ad-dl">
@@ -203,7 +226,8 @@ function Detail({ ref_, onClose, onChanged, onAuth }) {
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.querySelector('.ad-root') || document.body
   );
 }
 
@@ -247,14 +271,34 @@ function Applications({ onAuth }) {
         <div><b>{counts.approved}</b><span>Approved</span></div>
       </div>
       <div className="ad-toolbar">
-        <input type="search" placeholder="Search name, email, phone or ID" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search applications" />
+        <label className="ad-search"><Icon name="search" size={18} /><input type="search" placeholder="Search name, email, phone or ID" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search applications" /></label>
         <select value={pos} onChange={(e) => setPos(e.target.value)} aria-label="Filter by position"><option value="">All positions</option>{positions.map((p) => <option key={p}>{p}</option>)}</select>
         <select value={st} onChange={(e) => setSt(e.target.value)} aria-label="Filter by status"><option value="">All statuses</option>{ALL_STATUSES.map((s) => <option key={s}>{s}</option>)}</select>
-        <span className="spacer" />
-        <a className="ad-btn" href={apiBase + '/api/admin/export.csv'}>Export CSV</a>
-        <a className="ad-btn" href={apiBase + '/api/admin/export.csv?ssn=1'} onClick={exportSsn}>Export CSV with SSN</a>
+        <details className="ad-menu">
+          <summary className="ad-btn"><Icon name="down" size={18} /> Export</summary>
+          <div className="ad-menu-list">
+            <a href={apiBase + '/api/admin/export.csv'}>Spreadsheet (CSV)<small>Everything except the full SSN</small></a>
+            <a href={apiBase + '/api/admin/export.csv?ssn=1'} onClick={exportSsn}>CSV with full SSNs<small>Sensitive. You will be asked to confirm</small></a>
+          </div>
+        </details>
       </div>
       {shown.length === 0 ? <div className="ad-empty">{rows.length === 0 ? 'No applications yet.' : 'No applications match your search.'}</div> : (
+        <>
+        <div className="ad-cards">
+          {shown.map((r) => (
+            <article className="ad-appcard" key={r.ref} onClick={() => setOpen(r.ref)}>
+              <div className="ad-appcard-top"><b>{r.fullName}</b><span className={'ad-pill ' + r.review.status}>{r.review.status}</span></div>
+              <div className="ad-appcard-pos">{r.position}</div>
+              <div className="ad-appcard-meta"><span className="ad-mono">{r.ref}</span><span>{fmt(r.submittedAt)}</span></div>
+              <div className="ad-appcard-actions">
+                <button className="ad-btn small primary" onClick={() => setOpen(r.ref)}>Open</button>
+                <a className="ad-btn small" href={'tel:' + r.phone.replace(/[^\d+]/g, '')} onClick={(e) => e.stopPropagation()}>Call</a>
+                <a className="ad-btn small" href={'mailto:' + r.email} onClick={(e) => e.stopPropagation()}>Email</a>
+                <button className="ad-btn small danger" onClick={(e) => { e.stopPropagation(); removeRow(r); }} aria-label={`Delete application ${r.ref}`}>Delete</button>
+              </div>
+            </article>
+          ))}
+        </div>
         <div className="ad-tablewrap">
           <table className="ad-table">
             <thead><tr><th>Application ID</th><th>Name</th><th>Position</th><th>Email</th><th>Phone</th><th>Submitted</th><th>Status</th><th><span className="ad-sr">Actions</span></th></tr></thead>
@@ -269,6 +313,7 @@ function Applications({ onAuth }) {
             </tbody>
           </table>
         </div>
+        </>
       )}
       <p className="ad-muted small">{shown.length} of {rows.length} shown. Click a row to see everything the applicant submitted.</p>
       {open && <Detail ref_={open} onClose={() => setOpen('')} onChanged={load} onAuth={onAuth} />}
@@ -310,7 +355,7 @@ function Positions({ onAuth }) {
       <div className="ad-toolbar">
         <span className="ad-muted">{rows.filter((r) => r.st === 'open').length} open, {rows.filter((r) => r.st === 'closed').length} closed. Changes appear on the public site straight away.</span>
         <span className="spacer" />
-        <button className="ad-btn primary" onClick={() => setForm({ ...BLANK })}>Add a position</button>
+        <button className="ad-btn primary" onClick={() => setForm({ ...BLANK })}><Icon name="plus" size={18} /> Add a position</button>
       </div>
       {err && <div className="ad-err" role="alert">{err}</div>}
       {form && (
@@ -328,6 +373,20 @@ function Positions({ onAuth }) {
           <div className="ad-row"><button className="ad-btn primary" disabled={busy}>{form.ref ? 'Save changes' : 'Add position'}</button><button type="button" className="ad-btn" onClick={() => setForm(null)}>Cancel</button></div>
         </form>
       )}
+      <div className="ad-cards">
+        {sorted.map((r) => (
+          <article className="ad-appcard" key={r.ref}>
+            <div className="ad-appcard-top"><b>{r.role}</b><span className={'ad-pill ' + (r.st === 'open' ? 'open' : 'closed')}>{r.st}</span></div>
+            <div className="ad-appcard-pos">{r.site}, {r.base}</div>
+            <div className="ad-appcard-meta"><span className="ad-mono">{r.ref}</span><span>{DISCIPLINES[r.d]} &middot; {r.rot}</span></div>
+            <div className="ad-appcard-actions">
+              <button className="ad-btn small primary" disabled={busy} onClick={() => toggle(r)}>{r.st === 'open' ? 'Close' : 'Open'}</button>
+              <button className="ad-btn small" onClick={() => { setForm({ ...r }); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Edit</button>
+              <button className="ad-btn small danger" disabled={busy} onClick={() => remove(r)}>Delete</button>
+            </div>
+          </article>
+        ))}
+      </div>
       <div className="ad-tablewrap">
         <table className="ad-table plain">
           <thead><tr><th>Ref</th><th>Role</th><th>Unit and base</th><th>Rotation</th><th>Status</th><th>Actions</th></tr></thead>
@@ -363,6 +422,14 @@ function Activity({ onAuth }) {
   return (
     <>
       <p className="ad-muted">Who signed in, what they opened, exported or changed. The log never contains the applicants' details.</p>
+      <div className="ad-cards">
+        {rows.map((e, i) => (
+          <article className="ad-appcard slim" key={i}>
+            <div className="ad-appcard-top"><b>{e.action.replace(/_/g, ' ')}</b><span className="ad-muted small">{fmt(e.at)}</span></div>
+            <div className="ad-appcard-meta"><span>{e.user}</span><span className="ad-mono">{e.ref}</span></div>
+          </article>
+        ))}
+      </div>
       <div className="ad-tablewrap">
         <table className="ad-table plain">
           <thead><tr><th>When</th><th>Admin</th><th>Action</th><th>Item</th><th>From</th></tr></thead>
@@ -390,23 +457,37 @@ export default function AdminApp() {
   const logout = async () => { try { await adminApi('/logout', { method: 'POST' }); } catch { /* already out */ } setUser(''); };
 
   if (user === undefined) return <div className="ad-root"><p className="ad-muted pad">Loading...</p></div>;
-  if (!user) return <div className="ad-root"><Login onIn={() => adminApi('/me').then((d) => setUser(d.user)).catch(() => setUser(''))} /></div>;
+  if (!user) return <div className="ad-root ad-enter"><Login onIn={() => adminApi('/me').then((d) => setUser(d.user)).catch(() => setUser(''))} /></div>;
+  const TABS = [['applications', 'Applications', 'inbox', 'Review, approve and export what applicants submitted.'], ['positions', 'Positions', 'briefcase', 'Open, close and edit the roles shown on the website.'], ['activity', 'Activity', 'clock', 'A record of who viewed or changed what.']];
+  const current = TABS.find((t) => t[0] === tab);
   return (
-    <div className="ad-root">
-      <header className="ad-top">
+    <div className="ad-root ad-shell">
+      <aside className="ad-side">
         <div className="ad-brand">GDoilco <span>Admin</span></div>
         <nav aria-label="Admin sections">
-          {[['applications', 'Applications'], ['positions', 'Positions'], ['activity', 'Activity']].map(([k, n]) => (
-            <button key={k} aria-current={tab === k ? 'page' : undefined} onClick={() => setTab(k)}>{n}</button>
+          {TABS.map(([k, n, ic]) => (
+            <button key={k} aria-current={tab === k ? 'page' : undefined} onClick={() => setTab(k)}><Icon name={ic} /> {n}</button>
           ))}
         </nav>
-        <div className="ad-user">{user}<button className="ad-btn small" onClick={logout}>Sign out</button></div>
+        <div className="ad-side-foot"><span className="ad-avatar" aria-hidden="true">{user.slice(0, 1).toUpperCase()}</span><span className="ad-who">{user}</span><button className="ad-icon-btn light" onClick={logout} aria-label="Sign out"><Icon name="out" /></button></div>
+      </aside>
+      <header className="ad-bar">
+        <div className="ad-brand">GDoilco <span>Admin</span></div>
+        <button className="ad-icon-btn" onClick={logout} aria-label="Sign out"><Icon name="out" /></button>
       </header>
       <main className="ad-main">
-        {tab === 'applications' && <Applications onAuth={out} />}
-        {tab === 'positions' && <Positions onAuth={out} />}
-        {tab === 'activity' && <Activity onAuth={out} />}
+        <div className="ad-pagehead"><h1>{current[1]}</h1><p>{current[3]}</p></div>
+        <div className="ad-view" key={tab}>
+          {tab === 'applications' && <Applications onAuth={out} />}
+          {tab === 'positions' && <Positions onAuth={out} />}
+          {tab === 'activity' && <Activity onAuth={out} />}
+        </div>
       </main>
+      <nav className="ad-tabbar" aria-label="Admin sections">
+        {TABS.map(([k, n, ic]) => (
+          <button key={k} aria-current={tab === k ? 'page' : undefined} onClick={() => setTab(k)}><Icon name={ic} size={22} /><span>{n}</span></button>
+        ))}
+      </nav>
     </div>
   );
 }

@@ -13,6 +13,7 @@ import { encrypt, loadKey } from './crypto.js';
 import { createStore } from './store.js';
 import { createAdminRouter } from './admin.js';
 import { createMailer } from './mailer.js';
+import { hashPassword } from './password.js';
 import { ROLES, CONTACT } from '../src/data.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -22,6 +23,16 @@ const MAX_FILE = 8 * 1024 * 1024;
 
 let KEY;
 try { KEY = loadKey(); } catch (e) { console.error(e.message); process.exit(1); }
+// On a host where you cannot run "npm run admin:setup" (Railway, Render...): set ADMIN_USERNAME and ADMIN_PASSWORD once.
+// The account is created on first start if none exists. Afterwards delete ADMIN_PASSWORD from the host's variables.
+{
+  const file = path.join(DATA_DIR, 'admin.json');
+  const u = (process.env.ADMIN_USERNAME || '').trim(), pw = process.env.ADMIN_PASSWORD || '';
+  if (!fs.existsSync(file) && u && pw) {
+    if (!/^[A-Za-z0-9._-]{3,40}$/.test(u) || pw.length < 12) console.error('ADMIN_USERNAME or ADMIN_PASSWORD is not valid (username 3 to 40 letters, numbers . _ -; password at least 12 characters). No admin account was created.');
+    else { fs.mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 }); fs.writeFileSync(file, JSON.stringify({ username: u, ...hashPassword(pw), createdAt: new Date().toISOString() }, null, 2), { mode: 0o600 }); console.log('Admin account created for ' + u + '. Remove ADMIN_PASSWORD from your variables now.'); }
+  }
+}
 const store = createStore({ dataDir: DATA_DIR, key: KEY, seedRoles: ROLES });
 const mailer = createMailer({ dataDir: DATA_DIR });
 console.log(mailer.live ? `Emails are sent through ${process.env.SMTP_HOST}.` : 'No SMTP_HOST in .env: emails are saved as web pages in the outbox folder instead of being sent.');
@@ -168,7 +179,8 @@ if (fs.existsSync(dist)) {
       'X-Frame-Options': 'DENY',
       'X-Content-Type-Options': 'nosniff',
       'Referrer-Policy': 'same-origin',
-      'Content-Security-Policy': "default-src 'self'; img-src 'self' data: blob: https://images.pexels.com; media-src 'self' blob: https://videos.pexels.com https://*.pexels.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+      // Pexels serves the photos and videos. Smartsupp (live chat) needs its three domains.
+      'Content-Security-Policy': "default-src 'self'; script-src 'self' https://*.smartsuppchat.com https://*.smartsuppcdn.com; img-src 'self' data: blob: https://images.pexels.com https://*.smartsuppcdn.com; media-src 'self' blob: https://videos.pexels.com https://*.pexels.com https://*.smartsuppcdn.com; style-src 'self' 'unsafe-inline' https://*.smartsuppcdn.com; font-src 'self' data: https://*.smartsuppcdn.com; connect-src 'self' https://*.smartsupp.com wss://*.smartsupp.com https://*.smartsuppchat.com https://*.smartsuppcdn.com; frame-src https://*.smartsuppchat.com https://*.smartsupp.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
     });
     next();
   });

@@ -8,6 +8,8 @@ import Jobs from './pages/Jobs.jsx';
 import Safety from './pages/Safety.jsx';
 import Contact from './pages/Contact.jsx';
 import Apply from './pages/Apply.jsx';
+import SmartsuppChat from './components/SmartsuppChat.jsx';
+import MobileBar from './components/MobileBar.jsx';
 
 // The admin site is loaded only when someone opens /admin, so the public site stays small.
 const AdminApp = lazy(() => import('./admin/AdminApp.jsx'));
@@ -84,6 +86,8 @@ export default function App() {
       <Header />
       <main id="main"><AnimatedRoutes /></main>
       <Footer />
+      <MobileBar />
+      <SmartsuppChat />
     </>
   );
 }

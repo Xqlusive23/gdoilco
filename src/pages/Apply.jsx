@@ -214,7 +214,7 @@ function ApplyForm({ openRoles: OPEN_ROLES }) {
 
   return (
     <>
-      <Hero photo="glow" scene="rise" rigX={0.62} eyebrow="Application form" title="Apply for a rotation." lede={`Five short sections. It takes about ten minutes, and you can see your progress on the left. ${OPEN_ROLES.length === 1 ? `Only the ${OPEN_ROLES[0].role} position is open right now.` : `${OPEN_ROLES.length} positions are open right now.`} Only one application per person is accepted.`} />
+      <Hero photo="glow" scene="rise" rigX={0.62} eyebrow="Application form" title="Apply for a rotation." lede={`Five short sections. It takes about ten minutes, and you can follow your progress as you go. ${OPEN_ROLES.length === 1 ? `Only the ${OPEN_ROLES[0].role} position is open right now.` : `${OPEN_ROLES.length} positions are open right now.`} Only one application per person is accepted.`} />
       <section className="section">
         <div className="wrap form-layout">
           <aside>

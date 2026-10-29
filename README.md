@@ -61,6 +61,16 @@ if the Social Security number or the email address matches an earlier one (the e
 The check uses keyed hashes, so it works without keeping extra copies of the numbers. If an admin deletes an application,
 that person can apply again.
 
+## Deploying on Railway
+
+1. Put the project in a GitHub repository (`.env` and `server/data` are already ignored) and create a Railway project from it.
+2. Add a **Volume** to the service and mount it at `/data`. Without a volume, applications and ID images are lost on every deploy.
+3. Variables to add: `SSN_ENCRYPTION_KEY` (from `npm run keygen`; back it up), `DATA_DIR=/data`, `TRUST_PROXY=1`, `PUBLIC_URL=https://your-domain`,
+   `ADMIN_USERNAME` and `ADMIN_PASSWORD` (the first start creates the admin login; delete `ADMIN_PASSWORD` afterwards), the `SMTP_*` and `MAIL_FROM` lines for Resend,
+   and `VITE_SMARTSUPP_KEY` if you use chat.
+4. Build command `npm run build`, start command `npm start`. Railway sets `PORT` itself. Use `/api/health` as the health check.
+5. Under Networking, generate a domain or add your own, and add the DNS record Railway shows you. Run one copy of the service only, because the data lives in a single volume.
+
 ## Emails and approval
 
 - **On submit,** the applicant gets a designed email (logo, rig picture, application number, position, what happens next).
