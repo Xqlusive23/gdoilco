@@ -12,6 +12,9 @@ export const STATUS = { open: 'Open', closed: 'Closed' };
 // Only roles with st: 'open' can be applied for. To reopen a role, change its st to 'open'.
 export const isOpen = (r) => r.st === 'open';
 
+// Where the job is done. Remote roles show "Remote" first, then the country or region the employer hires in.
+export const placeOf = (r) => (r.remote ? 'Remote' + (r.base ? ', ' + r.base : '') : r.base);
+
 // Sample listings. Edit this array to change the boards and the role list on the application form.
 // rot is days on / days off for rotating crews, or a schedule label for shore-based jobs.
 export const ROLES = [
@@ -28,7 +31,7 @@ export const ROLES = [
   { ref: 'GD-1081', role: 'HSE Advisor', d: 'hse', site: 'Drillship', base: 'Houston, TX', rot: '14/14', certs: 'OSHA 30, SafeGulf, TWIC', st: 'closed' },
   { ref: 'GD-1082', role: 'Offshore Medic', d: 'hse', site: 'Fixed platform', base: 'Lafayette, LA', rot: '14/14', certs: 'EMT or paramedic license, SafeGulf', st: 'closed' },
   { ref: 'GD-1091', role: 'Camp Boss', d: 'support', site: 'Land rig camp, Permian Basin', base: 'Midland, TX', rot: '14/14', certs: 'ServSafe Manager certificate', st: 'closed' },
-  { ref: 'GD-1101', role: 'Disbursement Officer', d: 'support', site: 'Corporate office', base: 'Houston, TX', rot: 'Full-time', certs: 'Accounting or finance degree, A/P experience', st: 'open' },
+  { ref: 'GD-1101', role: 'Disbursement Officer', d: 'support', site: 'Remote, work from home', base: 'United States', remote: true, rot: 'Full-time', certs: 'Accounting or finance degree, A/P experience', st: 'open' },
 ];
 
 // Edit these once: they appear on the Contact page and on the application form.

@@ -38,14 +38,21 @@ export function createStore({ dataDir, key, seedRoles }) {
     positions = seedRoles.map((r) => ({ ...r }));
     writeAtomic(POS, JSON.stringify(positions, null, 2));
   }
+  // One-time: the Disbursement Officer role is remote. Applies only to lists saved before the remote option existed.
+  if (positions.some((r) => r.remote === undefined)) {
+    positions = positions.map((r) => (r.remote !== undefined ? r : r.role === 'Disbursement Officer' ? { ...r, site: 'Remote, work from home', base: 'United States', remote: true } : { ...r, remote: false }));
+    writeAtomic(POS, JSON.stringify(positions, null, 2));
+  }
   const savePositions = () => writeAtomic(POS, JSON.stringify(positions, null, 2));
 
   function checkPosition(input) {
     const p = {
       role: clean(input.role, 80), d: clean(input.d, 20), site: clean(input.site, 100), base: clean(input.base, 80),
       rot: clean(input.rot, 40), certs: clean(input.certs, 200), st: clean(input.st, 10),
+      remote: input.remote === true || input.remote === 'true',
     };
-    for (const k of ['role', 'site', 'base', 'rot']) if (!p[k]) return { error: 'Fill in the role, site, base and rotation.' };
+    for (const k of ['role', 'site', 'rot']) if (!p[k]) return { error: 'Fill in the role, site and rotation.' };
+    if (!p.remote && !p.base) return { error: 'Fill in the base, or tick Remote.' };
     if (!DISCIPLINES[p.d]) return { error: 'Choose a discipline from the list.' };
     if (!['open', 'closed'].includes(p.st)) return { error: 'Status must be open or closed.' };
     return { value: p };

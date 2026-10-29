@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { DISCIPLINES, STATUS, isOpen } from '../data.js';
+import { DISCIPLINES, STATUS, isOpen, placeOf } from '../data.js';
 
 function useCentralClock() {
   const [t, setT] = useState('');
@@ -33,8 +33,8 @@ export default function Board({ roles, note }) {
             {sorted.map((r) => (
               <tr key={r.ref} className={isOpen(r) ? '' : 'is-closed'}>
                 <td className="ref">{r.ref}</td>
-                <td className="role">{r.role}<small>{DISCIPLINES[r.d]}</small></td>
-                <td className="site">{r.site}<small>{r.base}</small></td>
+                <td className="role">{r.role}{r.remote && <span className="remote-tag">Remote</span>}<small>{DISCIPLINES[r.d]}</small></td>
+                <td className="site">{r.site}<small>{placeOf(r)}</small></td>
                 <td className="rot">{r.rot}</td>
                 <td className="certs">{r.certs}</td>
                 <td className="st"><span className={'pill ' + r.st}>{STATUS[r.st]}</span></td>

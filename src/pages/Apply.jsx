@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import Hero from '../components/Hero.jsx';
-import { CONTACT, isOpen } from '../data.js';
+import { CONTACT, isOpen, placeOf } from '../data.js';
 import { usePositions } from '../lib/positions.js';
 import { downloadText, submitApplication, summaryText } from '../lib/submit.js';
 
@@ -262,7 +262,7 @@ function ApplyForm({ openRoles: OPEN_ROLES }) {
                 <select {...bind('position')}>
                   <option value="">Select a position</option>
                   {OPEN_ROLES.map((r) => (
-                    <option key={r.ref} value={`${r.role} (${r.ref})`}>{r.role} - {r.base}, {r.rot}</option>
+                    <option key={r.ref} value={`${r.role} (${r.ref})`}>{r.role} - {placeOf(r)}, {r.rot}</option>
                   ))}
                 </select>
               </Field>

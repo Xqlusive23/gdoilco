@@ -322,7 +322,7 @@ function Applications({ onAuth }) {
 }
 
 // ---------------------------------------------------------------- positions
-const BLANK = { role: '', d: 'drilling', site: '', base: '', rot: '', certs: '', st: 'open' };
+const BLANK = { role: '', d: 'drilling', site: '', base: '', rot: '', certs: '', st: 'open', remote: false };
 
 function Positions({ onAuth }) {
   const [rows, setRows] = useState(null);
@@ -364,8 +364,9 @@ function Positions({ onAuth }) {
           <div className="ad-grid">
             <label>Role title<input required maxLength={80} value={form.role} onChange={set('role')} /></label>
             <label>Discipline<select value={form.d} onChange={set('d')}>{Object.entries(DISCIPLINES).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>
-            <label>Unit or site<input required maxLength={100} value={form.site} onChange={set('site')} placeholder="Jack-up rig, Gulf of Mexico" /></label>
-            <label>Base<input required maxLength={80} value={form.base} onChange={set('base')} placeholder="Houston, TX" /></label>
+            <label className="ad-switch"><input type="checkbox" checked={!!form.remote} onChange={(e) => setForm({ ...form, remote: e.target.checked, site: e.target.checked && !form.site ? 'Remote, work from home' : form.site })} /> <span>Remote job (work from home)</span></label>
+            <label>Unit or site<input required maxLength={100} value={form.site} onChange={set('site')} placeholder={form.remote ? 'Remote, work from home' : 'Jack-up rig, Gulf of Mexico'} /></label>
+            <label>{form.remote ? 'Region (optional)' : 'Base'}<input required={!form.remote} maxLength={80} value={form.base} onChange={set('base')} placeholder={form.remote ? 'United States' : 'Houston, TX'} /></label>
             <label>Rotation<input required maxLength={40} value={form.rot} onChange={set('rot')} placeholder="14/14 or Full-time" /></label>
             <label>Certificates needed<input maxLength={200} value={form.certs} onChange={set('certs')} placeholder="SafeGulf, TWIC" /></label>
             <label>Status<select value={form.st} onChange={set('st')}><option value="open">Open for applications</option><option value="closed">Closed</option></select></label>
@@ -377,8 +378,8 @@ function Positions({ onAuth }) {
         {sorted.map((r) => (
           <article className="ad-appcard" key={r.ref}>
             <div className="ad-appcard-top"><b>{r.role}</b><span className={'ad-pill ' + (r.st === 'open' ? 'open' : 'closed')}>{r.st}</span></div>
-            <div className="ad-appcard-pos">{r.site}, {r.base}</div>
-            <div className="ad-appcard-meta"><span className="ad-mono">{r.ref}</span><span>{DISCIPLINES[r.d]} &middot; {r.rot}</span></div>
+            <div className="ad-appcard-pos">{r.site}{r.remote ? '' : ', ' + r.base}</div>
+            <div className="ad-appcard-meta"><span className="ad-mono">{r.ref}</span><span>{DISCIPLINES[r.d]} &middot; {r.rot}{r.remote ? ' · Remote' : ''}</span></div>
             <div className="ad-appcard-actions">
               <button className="ad-btn small primary" disabled={busy} onClick={() => toggle(r)}>{r.st === 'open' ? 'Close' : 'Open'}</button>
               <button className="ad-btn small" onClick={() => { setForm({ ...r }); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Edit</button>
@@ -394,8 +395,8 @@ function Positions({ onAuth }) {
             {sorted.map((r) => (
               <tr key={r.ref}>
                 <td className="ad-mono">{r.ref}</td>
-                <td><b>{r.role}</b><small>{DISCIPLINES[r.d]}</small></td>
-                <td>{r.site}<small>{r.base}</small></td>
+                <td><b>{r.role}</b>{r.remote && <span className="ad-pill open remote">Remote</span>}<small>{DISCIPLINES[r.d]}</small></td>
+                <td>{r.site}<small>{r.remote ? 'Remote' + (r.base ? ', ' + r.base : '') : r.base}</small></td>
                 <td>{r.rot}</td>
                 <td><span className={'ad-pill ' + (r.st === 'open' ? 'open' : 'closed')}>{r.st}</span></td>
                 <td>

@@ -183,3 +183,7 @@ html.ad-lock { overflow: hidden; }
   .ad-enter, .ad-view, .ad-appcard, .ad-panel, .ad-panel-in, .ad-menu-list { animation: none; }
   .ad-btn, .ad-table tbody tr { transition: none; }
 }
+
+.ad-grid label.ad-switch { grid-template-columns: 24px 1fr; align-items: center; gap: 10px; grid-column: 1 / -1; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
+.ad-switch input { width: 22px; height: 22px; min-height: 0; padding: 0; margin: 0; accent-color: var(--accent); }
+.ad-pill.remote { margin-left: 8px; vertical-align: middle; }

@@ -8,7 +8,7 @@ import VideoBg from '../components/VideoBg.jsx';
 import { PHOTOS, VIDEOS } from '../media.js';
 import { DisciplineIcon } from '../components/Icons.jsx';
 import { JackUp, SemiSub, Drillship, LandRig } from '../components/RigSvgs.jsx';
-import { isOpen } from '../data.js';
+import { isOpen, placeOf } from '../data.js';
 import { usePositions } from '../lib/positions.js';
 
 const DISCIPLINE_TILES = [
@@ -33,7 +33,7 @@ export default function Home() {
   const { roles, loading } = usePositions();
   const OPEN_NOW = roles.filter(isOpen);
   const PREVIEW = [...OPEN_NOW, ...roles.filter((r) => !isOpen(r)).slice(0, 3)];
-  const TICKER = [...OPEN_NOW.map((r) => `Now hiring: ${r.role}, ${r.base}`), ...AREAS];
+  const TICKER = [...OPEN_NOW.map((r) => `Now hiring: ${r.role}, ${placeOf(r)}`), ...AREAS];
   return (
     <>
       <Hero
@@ -45,7 +45,7 @@ export default function Home() {
         {OPEN_NOW[0] && (
           <Link className="hire-pill" to={'/apply?role=' + OPEN_NOW[0].ref}>
             <span className="pulse" aria-hidden="true" />
-            Now hiring: {OPEN_NOW[0].role} · {OPEN_NOW[0].base}
+            Now hiring: {OPEN_NOW[0].role} · {placeOf(OPEN_NOW[0])}
             <span aria-hidden="true">&rarr;</span>
           </Link>
         )}

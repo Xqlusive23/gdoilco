@@ -2,7 +2,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import Hero from '../components/Hero.jsx';
 import Board from '../components/Board.jsx';
 import Marquee from '../components/Marquee.jsx';
-import { DISCIPLINES, isOpen } from '../data.js';
+import { DISCIPLINES, isOpen, placeOf } from '../data.js';
 import { usePositions } from '../lib/positions.js';
 
 export default function Jobs() {
@@ -13,7 +13,7 @@ export default function Jobs() {
   const openCount = shown.filter(isOpen).length;
   const openAll = ROLES.filter(isOpen);
   const ticker = [
-    ...ROLES.filter(isOpen).map((r) => `Open now: ${r.role}, ${r.base}`),
+    ...ROLES.filter(isOpen).map((r) => `Open now: ${r.role}, ${placeOf(r)}`),
     'Apply online in about ten minutes', 'Other positions reopen as crews rotate', 'Equal opportunity employer',
   ];
   const choose = (key) => (key === 'all' ? setParams({}) : setParams({ d: key }));

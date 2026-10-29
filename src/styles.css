@@ -724,3 +724,5 @@ input[type=text], input[type=email], input[type=tel], input[type=url], input[typ
   .progress { position: static; background: none; margin: 0; padding: 0; border: 0; }
   .form-layout > aside { position: sticky; top: 68px; z-index: 6; background: var(--bg); margin: 0 calc(var(--gutter) * -1); padding: 6px var(--gutter); border-bottom: 1px solid var(--line); }
 }
+
+.remote-tag { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 99px; font: 600 11px/1.4 var(--mono, monospace); letter-spacing: .06em; text-transform: uppercase; background: var(--accent); color: var(--on-accent, #fff); vertical-align: middle; }
