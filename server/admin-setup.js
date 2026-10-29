@@ -9,9 +9,7 @@ import { hashPassword } from './password.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(here, '..', process.env.DATA_DIR || './server/data');
-const username = process.env.ADMIN_USERNAME || (await ask('Admin username: ')).trim();
-const email = process.env.ADMIN_EMAIL || (await ask('Admin email: ')).trim();
-const password = process.env.ADMIN_PASSWORD || (await ask('Admin password: ')).trim();
+
 
 function ask(question, hidden = false) {
   return new Promise((resolve) => {
