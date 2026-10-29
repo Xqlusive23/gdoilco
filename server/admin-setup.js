@@ -10,6 +10,11 @@ import { hashPassword } from './password.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(here, '..', process.env.DATA_DIR || './server/data');
 
+// Fallback to environment variables if running in a non-interactive container
+const username = process.env.ADMIN_USERNAME || (await ask('Admin username: ')).trim();
+const email = process.env.ADMIN_EMAIL || (await ask('Admin email: ')).trim();
+const password = process.env.ADMIN_PASSWORD || (await ask('Admin password: ')).trim();
+
 function ask(question, hidden = false) {
   return new Promise((resolve) => {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
@@ -18,37 +23,12 @@ function ask(question, hidden = false) {
   });
 }
 
-// Support environment variables for non-interactive environments (like Railway), falling back to prompts
-let username = process.env.ADMIN_USERNAME;
-let pw = process.env.ADMIN_PASSWORD;
-
-if (!username) {
-  username = (await ask('Admin username: ')).trim();
-} else {
-  username = username.trim();
-  console.log('Using ADMIN_USERNAME from environment variables.');
-}
-
-if (!/^[A-Za-z0-9._-]{3,40}$/.test(username)) { 
-  console.error('Use 3 to 40 letters, numbers, dots, dashes or underscores.'); 
-  process.exit(1); 
-}
-
-if (!pw) {
-  pw = await ask('Admin password (at least 12 characters): ', true);
-  const again = await ask('Repeat the password: ', true);
-  if (pw !== again) { 
-    console.error('The passwords do not match.'); 
-    process.exit(1); 
-  }
-} else {
-  console.log('Using ADMIN_PASSWORD from environment variables.');
-}
-
-if (pw.length < 12) { 
-  console.error('The password must be at least 12 characters.'); 
-  process.exit(1); 
-}
+const username = (await ask('Admin username: ')).trim();
+if (!/^[A-Za-z0-9._-]{3,40}$/.test(username)) { console.error('Use 3 to 40 letters, numbers, dots, dashes or underscores.'); process.exit(1); }
+const pw = await ask('Admin password (at least 12 characters): ', true);
+const again = await ask('Repeat the password: ', true);
+if (pw !== again) { console.error('The passwords do not match.'); process.exit(1); }
+if (pw.length < 12) { console.error('The password must be at least 12 characters.'); process.exit(1); }
 
 fs.mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
 fs.writeFileSync(path.join(DATA_DIR, 'admin.json'), JSON.stringify({ username, ...hashPassword(pw), createdAt: new Date().toISOString() }, null, 2), { mode: 0o600 });
